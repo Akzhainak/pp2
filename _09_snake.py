@@ -1,235 +1,170 @@
 import pygame
+from pygame.math import Vector2
+import datetime
+import random 
 
-eraser = (255, 255, 255)
-black = (0, 0, 0)
-green = (34, 139, 34)
-blue = (0, 0, 255)
-red = (255, 0, 0)
-yellow = (255, 255, 0)
+
+# creating a snake class 
+class Snake:
+    def __init__(self):
+        self.body = [Vector2(7, 10), Vector2(6, 10), Vector2(5, 10)] # head, and body elements of the snake
+        self.eated = False # checker for snake eated the fruit or not
+        self.isDead = False # check snake dead or not
+
+    # drawing our snake
+    def drawingSnake(self):
+        for block in self.body: # the for loop that iterate our list of cooredinates of snake elements
+            body_rect = pygame.Rect(block.x * cell_size, block.y * cell_size, cell_size, cell_size) # creating rectangle of the snake elements
+            pygame.draw.rect(screen, (0 ,128 ,0), body_rect) # drawing the rectangles
+
+    # the moving of our snake
+    def snakeMoving(self):
+        if self.eated == True: # if snake eated the fruit
+            body_copy = self.body[:] # take the copy of the snake
+            body_copy.insert(0, body_copy[0] + direction) # adding the one element
+            self.body = body_copy[:] 
+            self.eated = False
+        else:
+            body_copy = self.body[:-1] # taking the copy of the snake except the last element
+            body_copy.insert(0, body_copy[0] + direction) # adding one element at index 0 this element is our head + direction
+            self.body = body_copy[:]
+
+# creating our Fruit class
+class Fruit:
+    def __init__(self):
+        self.randomize() # the method that spawns our fruit at the random position
+    
+    def drawingFruit(self):
+        fruit_rect = pygame.Rect(self.pos.x * cell_size, self.pos.y * cell_size, cell_size, cell_size) 
+        self.food = pygame.image.load(f'food{self.randomFood}.png').convert_alpha() # spawning random fruit
+        self.food = pygame.transform.scale(self.food, (35, 35)) # scale the image
+        # pygame.draw.rect(screen, (107 ,142 ,35), fruit_rect)
+        screen.blit(self.food, fruit_rect)
+
+    def randomize(self):
+        self.x = random.randint(0, cell_number - 2) # random cell between 0 - 18, whu 18 because if it will be bigger, the fruit will spawn on the borders 
+        self.y = random.randint(0, cell_number - 2) 
+        self.pos = Vector2(self.x, self.y)
+        self.randomFood = random.randint(1, 3) # taking random number between 1-3
+
+# creating the game class that will allow us to control the game
+class Game:
+    def __init__(self):
+        self.snake = Snake() # creating the snake object
+        self.fruit = Fruit() # creating the fruit object
+        self.level = 1 # our 1st level
+        self.snake_speed = 5 # snake speed, actually it is snake speed
+        self.score = 0 # the score, that will increase after eating the fruit
+        # self.isDead = False
+
+    # update method which responsible to snake moving and collision checker
+    def update(self):
+        self.snake.snakeMoving()
+        self.checkCollision()
+        # self.levelAdding()
+
+    def drawElements(self):
+        self.snake.drawingSnake()
+        self.fruit.drawingFruit()
+        self.scoreDrawing()
+    
+    def checkCollision(self):
+        if(self.fruit.pos == self.snake.body[0]): # if the coordinates of our snake and fruit will be equal, snake will eat
+            self.snake.eated = True
+            # the 3 types of the food that gives to us, three types of score
+            if(self.fruit.randomFood == 1):
+                self.score += 1
+            if(self.fruit.randomFood == 2):
+                self.score += 2
+            if(self.fruit.randomFood == 3):
+                self.score += 3
+            self.fruit.randomize() # after eating spawning at the random position
+            self.levelAdding() # check for adding level
+
+    # check for our snake collides with borders
+    def gameOver(self):
+        if self.snake.body[0].x >= 19:
+            return True
+        if self.snake.body[0].x <= 0:
+            return True
+        if self.snake.body[0].y >= 19:
+            return True
+        if self.snake.body[0].y <= 0:
+            return True
+        
+        # check for our snake collides with his body
+        for block in self.snake.body[1:]:
+            if block == self.snake.body[0]:
+                return True
+        return False
+    
+    # check for adding level or not for evety 3 points
+    def levelAdding(self):
+        if self.score % 3 == 0:
+            self.level += 1
+            self.snake_speed += 1
+    
+    # drawing the UI of our game, such us score and level
+    def scoreDrawing(self):
+        score_text = "Score: " + str(self.score)
+        score_surface = font.render(score_text, True, (56, 74, 12))
+        score_rect = score_surface.get_rect(center = (cell_size * cell_number - 120, 40))
+        screen.blit(score_surface, score_rect)
+
+        level_text = "Level: " + str(self.level)
+        level_surface = font.render(level_text, True, (56, 74, 12))
+        level_rect = level_surface.get_rect(center = (cell_size * cell_number - 120, 70))
+        screen.blit(level_surface, level_rect)
+
+
+
 
 pygame.init()
-screen = pygame.display.set_mode((640, 480))    
 clock = pygame.time.Clock()
-screen.fill((255, 255, 255))
+cell_size = 40
+cell_number = 20
+direction = Vector2(1, 0) # direction this means to right
+screen = pygame.display.set_mode((cell_size * cell_number, cell_size * cell_number)) # creating screen with are 800x800 or 20x20 cells square
+done = False
 
-pygame.display.set_caption("Paint")
-pygame.display.set_icon(pygame.image.load("paint_icon.png"))
 
 
-def main():    
-    radius = 15
-    mode = black
-    last_pos = None
-    draw = "line"
+font = pygame.font.Font('font.ttf', 25) # importing our font, from our file
 
-    while True:
-        # handle events
-        mouseX, mouseY = pygame.mouse.get_pos()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    return
-        
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and draw == "line":
-                # start a new line
-                last_pos = pygame.mouse.get_pos()
-            
-            if event.type == pygame.MOUSEMOTION and event.buttons[0] and draw == "line":
-                # draw a line from the last point to the current point
-                if last_pos is not None:
-                    start_pos = last_pos
-                    end_pos = pygame.mouse.get_pos()
-                    drawLineBetween(screen, start_pos, end_pos, radius, mode)
-                    last_pos = end_pos
+nowSeconds = int((datetime.datetime.now()).strftime("%S"))
 
-            if(draw == "rect" and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and mouseY > 30):
-                drawRectangle(screen, pygame.mouse.get_pos(), 200, 100, mode)
-            if(draw == "square" and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and mouseY > 30):
-                drawSquare(screen, pygame.mouse.get_pos(), 100, 100, mode)
-            if(draw == "circle" and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and mouseY > 30):
-                drawCircle(screen, pygame.mouse.get_pos(), mode)
-            if(draw == "etrien" and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and mouseY > 30):
-                drawRightTriangle(screen, mode, pygame.mouse.get_pos())
-            if(draw == "trien" and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and mouseY > 30):
-                drawEquilateralTriangle(screen, mode, pygame.mouse.get_pos())
-            if(draw == "rhombus" and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and mouseY > 30):
-                drawRhombus(screen, mode, pygame.mouse.get_pos())
+game = Game() # creating the game object
+ 
+while not done:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            done = True
+        # check for direction
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
+            if direction.x != -1:
+                direction = Vector2(1, 0)
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
+            if direction.x != 1:
+                direction = Vector2(-1, 0)
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+            if direction.y != 1:
+                direction = Vector2(0, -1)
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+            if direction.y != -1:
+                direction = Vector2(0, 1)
 
-            if(0 <= mouseY <= 30):
-                if(10 <= mouseX <= 30):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        mode = black
-                elif(30 <= mouseX <= 50):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        mode = green
-                elif(50 <= mouseX <= 70):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        mode = blue
-                elif(70 <= mouseX <= 90):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        mode = yellow
-                elif(90 <= mouseX <= 110):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        mode = red
-                elif(600 <= mouseX <= 630):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        mode = eraser
-                elif(150 <= mouseX <= 170):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        draw = "line"
-                elif(170 <= mouseX <= 200):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        draw = "rect"
-                elif(200 <= mouseX <= 230):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        draw = "square"
-                elif(230 <= mouseX <= 255):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        draw = "circle"
-                elif(255 <= mouseX <= 285):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        draw = "etrien"
-                elif(285 <= mouseX <= 315):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        draw = "trien"
-                elif(315 <= mouseX <= 345):
-                    if(event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
-                        draw = "rhombus"
-
-        taskBar()
-
-        pygame.display.flip()
-        clock.tick(60)
-        
-
-def drawLineBetween(screen, start, end, width, color_mode):
+    if(game.gameOver() == True): # if our game over returns true, we will end the game
+        done = True
     
-    color = color_mode
-    dx = start[0] - end[0]
-    dy = start[1] - end[1]
-    iterations = max(abs(dx), abs(dy))
-    
-    for i in range(iterations):
-        progress = 1.0 * i / iterations
-        aprogress = 1 - progress
-        x = int(aprogress * start[0] + progress * end[0])
-        y = int(aprogress * start[1] + progress * end[1])
-        pygame.draw.circle(screen, color, (x, y), width)
-
-def drawRectangle(screen, mouse_pos, w, h, color):
-    x = mouse_pos[0]
-    y = mouse_pos[1]
-    rect = pygame.Rect(x, y, w, h)
-    pygame.draw.rect(screen, color, rect, 3) # 4th parameter is outline of the rectangle
-
-def drawCircle(screen, mouse_pos, color):
-    x = mouse_pos[0]
-    y = mouse_pos[1]
-    pygame.draw.circle(screen, color, (x, y), 100, 100) # 4th parameter is outline of the rectangle
-
-def drawSquare(screen, mouse_pos, w, h, color):
-    x = mouse_pos[0]
-    y = mouse_pos[1]
-    rect = pygame.Rect(x, y, w, h)
-    pygame.draw.rect(screen, color, rect, 3) # 4th parameter is outline of the square
-
-def drawRightTriangle(screen, color, mouse_pos):
-    #define the points in a uint space
-    x = mouse_pos[0]
-    y = mouse_pos[1]
-    triangle_size = 50
-
-    # Calculate the triangle's vertices
-    triangle_points = [
-        (x, y - triangle_size),
-        (x - triangle_size, y + triangle_size),
-        (x + triangle_size, y + triangle_size),
-    ]
-
-    # Draw the triangle
-    pygame.draw.polygon(screen, color, triangle_points)
-
-def drawEquilateralTriangle(screen, color, mouse_pos):
-    #define the points in a uint space
-    x = mouse_pos[0]
-    y = mouse_pos[1]
-    triangle_size = 50
-
-    # Calculate the triangle's vertices
-    triangle_points = [
-        (x, y - triangle_size - 100),
-        (x - triangle_size, y + triangle_size),
-        (x + triangle_size, y + triangle_size),
-    ]
-
-    # Draw the triangle
-    pygame.draw.polygon(screen, color, triangle_points)  
-
-def drawRhombus(screen, color, mouse_pos):
-    #define the points in a uint space
-    x = mouse_pos[0]
-    y = mouse_pos[1]
-    rhombus_height = 50
-    rhombus_width = 50
-
-    # Calculate the rhombus's vertices
-    rhombus_points = [
-        (x, y - rhombus_height),
-        (x + rhombus_width, y),
-        (x, y + rhombus_height),
-        (x - rhombus_width , y),
-    ]
-
-    # Draw the triangle
-    pygame.draw.polygon(screen, color, rhombus_points)
-
-# Drawing taskbar  
-def taskBar():
-    menu = pygame.image.load("menu.png")
-    screen.blit(menu, (0, 0))
-    
-    black_rect = (10, 5, 20, 20)
-    pygame.draw.rect(screen, black, black_rect)
-    green_rect = (30, 5, 20, 20)
-    pygame.draw.rect(screen, green, green_rect)
-    blue_rect = (50, 5, 20, 20)
-    pygame.draw.rect(screen, blue, blue_rect)
-    yellow_rect = (70, 5, 20, 20)
-    pygame.draw.rect(screen, yellow, yellow_rect)
-    red_rect = (90, 5, 20, 20)
-    pygame.draw.rect(screen, red, red_rect)
-
-    lineImage = pygame.image.load("drawline.png")
-    lineImage = pygame.transform.scale(lineImage, (20, 20))
-    screen.blit(lineImage, (150, 5))
-
-    rectImage = pygame.image.load("rect.png")
-    rectImage = pygame.transform.scale(rectImage, (30, 30))
-    screen.blit(rectImage, (170, 0))
-
-    squareImage = pygame.image.load("square.png")
-    squareImage = pygame.transform.scale(squareImage, (30, 30))
-    screen.blit(squareImage, (200, 0))
-
-    circleImage = pygame.image.load("circle.png")
-    circleImage = pygame.transform.scale(circleImage, (25, 25))
-    screen.blit(circleImage, (230, 3))
-
-    etrienImage = pygame.image.load("etrien.png")
-    etrienImage = pygame.transform.scale(etrienImage, (30, 30))
-    screen.blit(etrienImage, (255, 0))
-
-    trienImage = pygame.image.load("trien.png")
-    trienImage = pygame.transform.scale(trienImage, (30, 30))
-    screen.blit(trienImage, (285, 0))
-
-    rhombusImage = pygame.image.load("rhombus.png")
-    rhombusImage = pygame.transform.scale(rhombusImage, (30, 30))
-    screen.blit(rhombusImage, (315, 0))
-
-    eraserImage = pygame.image.load("eraser.png")
-    eraserImage = pygame.transform.scale(eraserImage, (30, 30))
-    screen.blit(eraserImage, (600, 0))
-main()
+    # check for to randomly spawn the fruit, if you wont eat the fruit after 3 seconds it will be spawned at the random position
+    time = datetime.datetime.now()
+    seconds = int(time.strftime("%S"))
+    if abs(seconds - nowSeconds) > 3:
+        game.fruit.randomize()
+        nowSeconds = seconds
+    screen.fill((0, 0, 0))
+    game.drawElements()
+    game.update()
+    pygame.display.flip()
+    clock.tick(game.snake_speed)
+pygame.quit()
