@@ -1,0 +1,414 @@
+import psycopg2
+import csv
+
+def get_conn():
+    
+    conn = psycopg2.connect(
+        dbname="phonebook", #dadtabase name
+        user="postgres", #replace with your postgresql username
+        password ="2121", #replace with your postgresql password
+        host="localhost", #local host
+        port="5432" #default postgre port
+    )
+    return conn
+
+
+#cur = get_conn().cursor()   # cursor is a database object used to retrieve and manipulate rows from a query result one at a time.
+     
+
+def create_table():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS phonebook(
+                id SERIAL PRIMARY KEY,
+                first_name TEXT NOT NULL,
+                last_name  TEXT NOT NULL,
+                phone  BIGINT NOT NULL
+                )
+                ''')
+            conn.commit()
+
+def insert_csv():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            with open('phonfile.csv', 'r') as f:
+                reader = csv.reader(f, delimiter=';')  
+                next(reader)  # skip header
+                for row in reader:
+                    if len(row) >= 4:  # lenght of row
+                        cur.execute(
+                            '''
+                            INSERT INTO phonebook (first_name, last_name, phone)
+                            VALUES (%s, %s, %s)
+                            ''',
+                            (row[1], row[2], row[3])  # skip id
+                        )
+            conn.commit()
+
+
+#inserting from console
+def console():
+    first_name=input("write the first name: ")
+    last_name=input("write the last name: ")
+    phone=input("write the phone: ")
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO phonebook (first_name,last_name,phone) VALUES (%s,%s,%s)",(first_name,last_name,phone))
+            conn.commit()
+
+
+        
+
+#upating user info
+def up_all():
+    old_fname=input("write the old name: ")
+    new_fname=input("write the new name: ")
+    new_lname=input("write tne new last name: ")
+    nphone=input("write the new phone: ")
+    with get_conn() as conn:
+        with conn.cursor() as cur :
+            cur.execute("UPDATE phonebook SET first_name=%s, last_name=%s, phone=%s WHERE first_name=%s",(new_fname,new_lname,nphone,old_fname))
+            conn.commit()
+
+
+#change only fname
+def up_fname():
+    old_fname=input("write the old name: ")
+    new_fname=input("write the new first name: ")
+    with get_conn() as conn:
+        with conn.cursor() as cur :
+            cur.execute("UPDATE phonebook SET first_name=%s  WHERE first_name=%s",(new_fname,old_fname))
+            conn.commit()
+
+
+
+#change only last name
+def up_lname():
+    old_lname=input("write the old name: ")
+    new_lname=input("write tne last name: ")
+    with get_conn() as conn:
+        with conn.cursor() as cur :
+            cur.execute("UPDATE phonebook SET  last_name=%s WHERE last_name=%s",(new_lname,old_lname))
+            conn.commit()
+
+
+
+#change phone
+def up_ph():
+    old_phone=input("write the old name: ")
+    nphone=input("write the new phone: ")
+    with get_conn() as conn:
+        with conn.cursor() as cur :
+            cur.execute("UPDATE phonebook SET phone=%s WHERE phone=%s",(nphone,old_phone))
+            conn.commit()
+
+
+
+#quering fst name
+def q_fname():
+    first_name= input("Enter first name to search: ")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM phonebook WHERE first_name ILIKE %s", (f"%{first_name}%",))
+            rows = cur.fetchall()
+            for row in rows:
+                print(row)
+            
+
+
+
+#quering lst name
+def q_lname():
+    last_name=input("enter last name to search: ")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM phonebook WHERE last_name ILIKE %s",(f"%{last_name}%",))
+            rows=cur.fetchall()
+            for row in rows:
+                print(row)
+
+            
+
+
+
+#quering phones 
+def q_ph():
+    phone=input("enter phone to search: ")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM phonebook WHERE phone :: text ILIKE %s",(f"%{phone}%",))
+            rows=cur.fetchall()
+            for row in rows:
+                print(row)
+
+
+
+
+
+
+
+
+
+
+def mul_del_id():
+    ids=input("enter id-s to delete (comma seperated): ")
+    id_list = []
+    for id_str in ids.split(','):
+        id_str = id_str.strip()  # del space front back
+        if id_str.isdigit():     # only digit?
+            id_list.append(id_str) 
+
+    if not id_list:
+        print("No valid IDs provided.")
+        return
+
+    placeholders = ','.join(['%s'] * len(id_list))
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"DELETE FROM phonebook WHERE id IN ({placeholders})", id_list)
+            conn.commit()
+            print(f"{cur.rowcount} record(s) deleted.")
+
+
+def delt():
+    fname = input("enter first name to delete: ")
+    lname = input("or enter last name to delete: ")
+    phone = input("or enter phone to delete: ")
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM phonebook WHERE first_name = %s OR last_name=%s OR phone = %s", (fname,lname, phone))
+            conn.commit()
+
+
+#SQL CODES--------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+def pattern_fun():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE OR REPLACE FUNCTION find_pattern(pattern TEXT)
+                RETURNS TABLE (id INT, first_name TEXT, last_name TEXT, phone BIGINT)
+                AS $$
+                BEGIN 
+                    RETURN QUERY
+                    SELECT * FROM phonebook
+                    WHERE first_name ILIKE '%' || pattern || '%'
+                    OR last_name ILIKE '%' || pattern || '%'
+                    OR phone ::TEXT ILIKE '%' || pattern || '%';
+                END;
+                $$
+                """)
+            
+
+def insert_or_up():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE OR REPLACE PROCEDURE insert_or_up(
+                in_fname TEXT,
+                in_lname TEXT,
+                in_phone BIGINT
+                )
+                LANGUAGE plpgsql
+                AS $$
+                BEGIN 
+                    IF EXISTS(
+                    SELECT 1 FROM phonebook WHERE first_anme = in_fname AND last_name = in_lname
+                    ) THEN 
+                       UPDATE phonebook SET phone = in_phone 
+                       WHERE first_name = in_fname AND last_name = in_lname;
+                    ELSE 
+                       INSERT INTO phonebook(first_name, last_name, phone)
+                       VALUES (in_fname, in_lname, in_phone);
+                    END IF;
+                END;
+                $$;
+                """)
+            conn.commit()
+
+
+
+def create_insert_mul_users():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE OR REPLACE PROCEDURE insert_mul_users(
+                    names TEXT[],
+                    phones TEXT[],
+                    OUT invalid_entries TEXT[]
+                )
+                LANGUAGE plpgsql
+                AS $$
+                DECLARE
+                    i INT;
+                BEGIN
+                    invalid_entries := '{}';
+                    FOR i IN 1..array_length(names, 1)
+                    LOOP
+                        IF phones[i] ~ '^[0-9]{6,15}$' THEN
+                            PERFORM insert_or_update_user(
+                                split_part(names[i], ' ', 1),
+                                split_part(names[i], ' ', 2),
+                                phones[i]::BIGINT
+                            );
+                        ELSE
+                            invalid_entries := array_append(invalid_entries, names[i] || ' - ' || phones[i]);
+                        END IF;
+                    END LOOP;
+                END;
+                $$;
+            """)
+            conn.commit()
+
+            
+
+
+
+
+def get_users_fun():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE OR REPLACE FUNCTION get_users(limit_num INT, offset_num INT)
+                RETURNS TABLE (id INT, first_name TEXT, last_name TEXT, phone BIGINT)
+                AS $$
+                BEGIN
+                    RETURN QUERY
+                    SELECT * FROM phonebook
+                    ORDER BY id
+                    LIMIT limit_num OFFSET offset_num;
+                END;
+                $$ LANGUAGE plpgsql;
+            """)
+            conn.commit()
+
+
+
+
+def create_delete_by_name_or_phone():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE OR REPLACE PROCEDURE delete_by_name_or_phone(
+                    in_first TEXT,
+                    in_last TEXT,
+                    in_phone TEXT
+                )
+                LANGUAGE plpgsql
+                AS $$
+                BEGIN
+                    DELETE FROM phonebook
+                    WHERE first_name = in_first
+                       OR last_name = in_last
+                       OR phone::TEXT = in_phone;
+                END;
+                $$;
+            """)
+            conn.commit()
+
+
+
+
+
+
+
+
+def create_all_sql_objects():
+    pattern_fun()
+    insert_or_up()
+    create_insert_mul_users()
+    get_users_fun()
+    create_delete_by_name_or_phone()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#ENS OF SQL CODES--------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+create_table()
+while True:
+    print("""
+    1. insert from csv
+    2. insert from console
+    3. update 
+    4. query 
+    5. delete user
+    6. exit
+        """)
+    choice = input("choose: ")
+    if choice == '1':
+        insert_csv()
+    elif choice == '2':
+        console()
+    elif choice == '3':
+        print('''upadte:
+              1. all
+              2. first name
+              3. last name
+              4. phone
+              ''')
+        up=input("choose:")
+        if up =='1':
+            up_all()
+        elif up == '2':
+            up_fname()
+        elif up == '3':
+            up_lname()
+        elif up == '4':
+            up_ph()
+        else:
+            print("Invalid choice. Try again.")
+    elif choice == '4':
+        print('''query:
+            1. first name
+            2. last name
+            3. phone
+            ''')
+        qc=input("choose:")
+        if qc == '1':
+            q_fname()
+        elif qc == '2':
+            q_lname()
+        elif qc == '3':
+            q_ph()
+        else:
+            print("Invalid choice. Try again.")
+    elif choice == '5':
+        print("""deleting:
+              1. one user
+              2. with id mul users""")
+        d=input("chooose: ")
+        if d == '1':
+            delt()
+        elif d =='2':
+            mul_del_id()
+    elif choice == '6':
+        break
+    else:
+        print("Invalid choice. Try again.")
